@@ -3,57 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tap to Deduct Inventory</title>
+    <title>Inventory Adjuster with Project Tracking</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 20px; background: #fdfdfd; color: #222; }
-        .container { background: #ffffff; padding: 40px 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 360px; margin: 60px auto; border: 1px solid #eaeaea; }
-        .icon { font-size: 48px; margin-bottom: 10px; }
-        button { background: #dc3545; color: white; border: none; padding: 18px 30px; font-size: 18px; font-weight: bold; border-radius: 50px; cursor: pointer; width: 100%; transition: background 0.2s; box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2); }
-        button:disabled { background: #e0e0e0; color: #a0a0a0; box-shadow: none; cursor: not-allowed; }
-        #status { margin-top: 25px; font-size: 15px; line-height: 1.5; color: #666; }
-        .highlight { color: #dc3545; font-weight: bold; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-align: center; padding: 20px; background: #f8f9fa; margin: 0; }
+        .wrapper { background: #ffffff; padding: 35px 25px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 380px; margin: 40px auto; border: 1px solid #eee; }
+        h2 { color: #111; margin-bottom: 5px; }
+        p { color: #666; font-size: 14px; margin-bottom: 25px; }
+        
+        /* Input Field Styling */
+        .project-section { text-align: left; margin-bottom: 20px; }
+        .project-section label { font-size: 13px; font-weight: bold; color: #444; text-transform: uppercase; display: block; margin-bottom: 6px; }
+        .project-section input { width: 100%; padding: 12px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; background: #fafafa; }
+        .project-section input:focus { border-color: #007bff; outline: none; background: #fff; }
+
+        button { background: #007bff; color: white; border: none; padding: 16px 20px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; transition: background 0.2s; }
+        button:disabled { background: #dcdcdc; color: #999; cursor: not-allowed; }
+        
+        /* Modal Styles */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100; }
+        .modal-content { background: white; padding: 30px 20px; border-radius: 12px; width: 85%; max-width: 320px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        input[type="number"] { width: 80%; padding: 12px; font-size: 20px; margin: 15px 0; text-align: center; border: 2px solid #ccc; border-radius: 8px; }
+        .modal-btns { display: flex; gap: 10px; margin-top: 10px; }
+        .btn-confirm { background: #28a745; }
+        .btn-cancel { background: #6c757d; }
+        
+        #status { margin-top: 25px; font-size: 15px; color: #444; font-weight: 500; line-height: 1.4; min-height: 45px; }
+
+        /* History Log Styles */
+        .history-box { margin-top: 30px; border-top: 2px dashed #eee; padding-top: 20px; text-align: left; }
+        .history-title { font-size: 14px; font-weight: bold; color: #555; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px; }
+        .history-list { list-style: none; padding: 0; margin: 0; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; background: #fdfdfd; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #f0f0f0; font-size: 14px; }
+        .history-details { font-family: monospace; }
+        .badge { font-weight: bold; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-family: monospace; }
+        .badge-add { background: #e2f6ea; color: #28a745; }
+        .badge-remove { background: #fde8e9; color: #dc3545; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="icon">📦</div>
-    <h2>Stock Deduction</h2>
-    <p style="color: #666; margin-bottom: 30px;">Tap a bin tag to remove 1 item from inventory.</p>
+<div class="wrapper">
+    <div style="font-size: 50px; margin-bottom: 10px;">🔄</div>
+    <h2>Inventory Adjuster</h2>
+    <p>Assign a project code and tap a bin to update levels.</p>
 
-    <button id="scanBtn">Start Scan Session</button>
-    <div id="status">Ready. Click the button above to begin.</div>
+    <!-- New Project Selection Textbox -->
+    <div class="project-section">
+        <label for="projectInput">Active Project Number / ID:</label>
+        <input type="text" id="projectInput" placeholder="e.g., PROJ-2026-A" value="Internal Stock">
+    </div>
+
+    <button id="scanBtn">Activate NFC Antenna</button>
+    <div id="status">System idle. Ready to configure details.</div>
+
+    <div class="history-box">
+        <div class="history-title">🕒 Session History (Last 3)</div>
+        <ul id="historyList" class="history-list">
+            <li style="color: #aaa; font-style: italic; list-style: none; text-align: center; font-size: 13px; padding: 10px 0;">No items scanned yet.</li>
+        </ul>
+    </div>
+</div>
+
+<!-- Quantity Input Modal Overlay -->
+<div class="modal" id="qtyModal">
+    <div class="modal-content">
+        <h3 style="margin-top:0;">Bin Sensed!</h3>
+        <div id="modalBinDisplay" style="font-weight:bold; color:#007bff; margin-bottom:10px;"></div>
+        <label for="qtyInput">Enter adjustments:<br><small style="color:#777;">(Use positive numbers to add, negative numbers to deduct)</small></label>
+        <br>
+        <input type="number" id="qtyInput" placeholder="0" pattern="[0-9\-]*">
+        <div class="modal-btns">
+            <button class="btn-cancel" id="cancelBtn">Cancel</button>
+            <button class="btn-confirm" id="submitBtn">Update Sheet</button>
+        </div>
+    </div>
 </div>
 
 <script>
-    //https://script.google.com/macros/s/AKfycbwUIvRx_m0hW62YwqJ5HiGPPrnEO_xbtMkINUGggwWoDZuFU_IDXSsx_3VZP5T-NooXNw/exec
+    // PASTE YOUR RE-DEPLOYED GOOGLE APPS SCRIPT WEB APP URL HERE
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwUIvRx_m0hW62YwqJ5HiGPPrnEO_xbtMkINUGggwWoDZuFU_IDXSsx_3VZP5T-NooXNw/exec";
 
     const scanBtn = document.getElementById('scanBtn');
     const statusDiv = document.getElementById('status');
+    const qtyModal = document.getElementById('qtyModal');
+    const qtyInput = document.getElementById('qtyInput');
+    const projectInput = document.getElementById('projectInput');
+    const modalBinDisplay = document.getElementById('modalBinDisplay');
+    const submitBtn = document.getElementById('submitBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const historyList = document.getElementById('historyList');
+
+    let currentActiveBinId = "";
+    let localHistoryLog = [];
 
     scanBtn.addEventListener('click', async () => {
         if (!('NDEFReader' in window)) {
-            statusDiv.innerHTML = "❌ <span class='highlight'>Web NFC unsupported.</span> Please switch to Google Chrome on an Android mobile device.";
+            statusDiv.innerHTML = "❌ <b>Web NFC Unsupported</b><br>Please use Google Chrome on an Android smartphone.";
             return;
         }
 
         try {
-            statusDiv.innerHTML = "⏳ Turning on antenna hardware...";
+            statusDiv.innerHTML = "⏳ Booting device hardware...";
             const ndef = new NDEFReader();
             await ndef.scan();
             
-            statusDiv.innerHTML = "📡 <b>Antenna Active!</b><br>Physically tap a bin tag now...";
+            statusDiv.innerHTML = "📡 <b>Antenna Active!</b><br>Physically tap against a storage container chip...";
             scanBtn.disabled = true;
 
             ndef.addEventListener("readingerror", () => {
-                statusDiv.innerHTML = "⚠️ Scan failed. Keep the tag close to the back of the phone and try again.";
+                statusDiv.innerHTML = "⚠️ Reading error. Realign your phone sensor with the chip.";
             });
 
             ndef.addEventListener("reading", ({ message, serialNumber }) => {
-                statusDiv.innerHTML = "⚡ Tag sensed! Reading block data...";
-                
-                let binId = serialNumber; // Fallback to hardware serial if chip contains no text
+                let binId = serialNumber;
                 
                 for (const record of message.records) {
                     if (record.recordType === "text") {
@@ -62,7 +124,11 @@
                     }
                 }
 
-                deductStockInSheet(binId);
+                currentActiveBinId = binId;
+                modalBinDisplay.innerText = `ID: ${binId}`;
+                qtyInput.value = ""; 
+                qtyModal.style.display = "flex"; 
+                statusDiv.innerHTML = "Awaiting quantity input...";
             });
 
         } catch (error) {
@@ -71,28 +137,74 @@
         }
     });
 
-    async function deductStockInSheet(binId) {
-        statusDiv.innerHTML = `📤 Contacting server to deduct 1 item from bin: <b>${binId}</b>...`;
+    submitBtn.addEventListener('click', () => {
+        const value = parseInt(qtyInput.value, 10);
+        if (isNaN(value) || value === 0) {
+            alert("Please enter a valid non-zero transaction adjustment.");
+            return;
+        }
+        
+        qtyModal.style.display = "none";
+        
+        // Grab current value inside project textbox field
+        const activeProject = projectInput.value.trim() || "Unassigned";
+        transmitAdjustmentToCloud(currentActiveBinId, value, activeProject);
+    });
+
+    cancelBtn.addEventListener('click', () => {
+        qtyModal.style.display = "none";
+        statusDiv.innerHTML = "📡 <b>Antenna Active!</b><br>Ready to receive a new bin tap...";
+    });
+
+    async function transmitAdjustmentToCloud(binId, amount, projectCode) {
+        statusDiv.innerHTML = `📤 Syncing details to cloud under project: [${projectCode}]...`;
         
         try {
             await fetch(GOOGLE_SCRIPT_URL, {
                 method: "POST",
-                mode: "no-cors", // Bypasses browser strict CORS cross-origin blocks
+                mode: "no-cors", 
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ binId: binId })
+                body: JSON.stringify({ binId: binId, adjustmentAmount: amount, projectNum: projectCode })
             });
 
-            // Note: with "no-cors", we can't read the response payload back, 
-            // but we can guarantee the payload is successfully dispatched to your script.
-            statusDiv.innerHTML = `✅ <b>Success!</b><br>Removed 1 item from Bin <b>${binId}</b>. Ready for next tap.`;
+            statusDiv.innerHTML = `✅ <b>Success!</b><br>Logged ${amount} units for Bin <b>${binId}</b> under <b>${projectCode}</b>.`;
+            
+            updateHistoryUI(binId, amount, projectCode);
+
         } catch (error) {
-            statusDiv.innerHTML = `❌ Update failed: ${error}`;
+            statusDiv.innerHTML = `❌ Network Transmission Error: ${error}`;
         } finally {
-            // Instantly ready to listen for the next tap
             scanBtn.disabled = false;
         }
     }
-</script>
 
-</body>
-</html>
+    function updateHistoryUI(binId, amount, projectCode) {
+        const newLogEntry = {
+            bin: binId,
+            change: amount,
+            proj: projectCode,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        localHistoryLog.unshift(newLogEntry);
+
+        if (localHistoryLog.length > 3) {
+            localHistoryLog.pop();
+        }
+
+        historyList.innerHTML = "";
+        
+        localHistoryLog.forEach(item => {
+            const li = document.createElement('li');
+            li.className = "history-item";
+            
+            const badgeClass = item.change > 0 ? "badge badge-add" : "badge badge-remove";
+            const prefix = item.change > 0 ? "+" : "";
+            
+            li.innerHTML = `
+                <div class="history-details">
+                    <strong>${item.bin}</strong> <span style="color:#666;">(${item.proj})</span><br>
+                    <span style="font-size:11px; color:#999;">Logged at ${item.time}</span>
+                </div>
+                <span class="${badgeClass}">${prefix}${item.change}</span>
+            `;
