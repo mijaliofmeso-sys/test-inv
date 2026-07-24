@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tap to Deduct Inventory</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 20px; background: #fdfdfd; color: #222; }
+        .container { background: #ffffff; padding: 40px 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 360px; margin: 60px auto; border: 1px solid #eaeaea; }
+        .icon { font-size: 48px; margin-bottom: 10px; }
+        button { background: #dc3545; color: white; border: none; padding: 18px 30px; font-size: 18px; font-weight: bold; border-radius: 50px; cursor: pointer; width: 100%; transition: background 0.2s; box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2); }
+        button:disabled { background: #e0e0e0; color: #a0a0a0; box-shadow: none; cursor: not-allowed; }
+        #status { margin-top: 25px; font-size: 15px; line-height: 1.5; color: #666; }
+        .highlight { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="icon">📦</div>
+    <h2>Stock Deduction</h2>
+    <p style="color: #666; margin-bottom: 30px;">Tap a bin tag to remove 1 item from inventory.</p>
+
+    <button id="scanBtn">Start Scan Session</button>
+    <div id="status">Ready. Click the button above to begin.</div>
+</div>
+
+<script>
+    //https://script.google.com/macros/s/AKfycbwUIvRx_m0hW62YwqJ5HiGPPrnEO_xbtMkINUGggwWoDZuFU_IDXSsx_3VZP5T-NooXNw/exec
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwUIvRx_m0hW62YwqJ5HiGPPrnEO_xbtMkINUGggwWoDZuFU_IDXSsx_3VZP5T-NooXNw/exec";
+
+    const scanBtn = document.getElementById('scanBtn');
+    const statusDiv = document.getElementById('status');
+
+    scanBtn.addEventListener('click', async () => {
+        if (!('NDEFReader' in window)) {
+            statusDiv.innerHTML = "❌ <span class='highlight'>Web NFC unsupported.</span> Please switch to Google Chrome on an Android mobile device.";
+            return;
+        }
+
+        try {
+            statusDiv.innerHTML = "⏳ Turning on antenna hardware...";
+            const ndef = new NDEFReader();
+            await ndef.scan();
+            
+            statusDiv.innerHTML = "📡 <b>Antenna Active!</b><br>Physically tap a bin tag now...";
+            scanBtn.disabled = true;
+
+            ndef.addEventListener("readingerror", () => {
+                statusDiv.innerHTML = "⚠️ Scan failed. Keep the tag close to the back of the phone and try again.";
+            });
+
+            ndef.addEventListener("reading", ({ message, serialNumber }) => {
+                statusDiv.innerHTML = "⚡ Tag sensed! Reading block data...";
+                
+                let binId = serialNumber; // Fallback to hardware serial if chip contains no text
+                
+                for (const record of message.records) {
+                    if (record.recordType === "text") {
+                        const textDecoder = new TextDecoder(record.encoding);
+                        binId = textDecoder.decode(record.data);
+                    }
+                }
+
+                deductStockInSheet(binId);
+            });
+
+        } catch (error) {
+            statusDiv.innerHTML = `❌ Hardware Error: ${error}`;
+            scanBtn.disabled = false;
+        }
+    });
+
+    async function deductStockInSheet(binId) {
+        statusDiv.innerHTML = `📤 Contacting server to deduct 1 item from bin: <b>${binId}</b>...`;
+        
+        try {
+            await fetch(GOOGLE_SCRIPT_URL, {
+                method: "POST",
+                mode: "no-cors", // Bypasses browser strict CORS cross-origin blocks
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ binId: binId })
+            });
+
+            // Note: with "no-cors", we can't read the response payload back, 
+            // but we can guarantee the payload is successfully dispatched to your script.
+            statusDiv.innerHTML = `✅ <b>Success!</b><br>Removed 1 item from Bin <b>${binId}</b>. Ready for next tap.`;
+        } catch (error) {
+            statusDiv.innerHTML = `❌ Update failed: ${error}`;
+        } finally {
+            // Instantly ready to listen for the next tap
+            scanBtn.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>
